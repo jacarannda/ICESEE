@@ -116,6 +116,7 @@ def initializeRun(kwargs, forward_solver, mesh, Q, V):
     """ define smb and melt """
     smb = readSMB(kwargs,Q)
     
+    
     return h, h0, s, s0, u, bed, zF, grounded, floating, A0, beta0, smb
 
 
@@ -184,10 +185,11 @@ def BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experimen
         # The period over which BMR increases shortens by 'x' years
         else:
             melt_max = ((final_bmr - beginning_bmr)/(kwargs["num_years"] - kwargs["bmr_increase_time"])) * ((step - (kwargs["bmr_increase_time"]/kwargs["dt"])) * kwargs["dt"]) + beginning_bmr
-    
-    # "wrong" model where basal melt rate does not change over the entire simulation
-    if experiment == 'false':
+    else:
         melt_max = beginning_bmr
+    # "wrong" model where basal melt rate does not change over the entire simulation
+    #if experiment == 'false':
+        #melt_max = beginning_bmr
 
     ##########################################
     
@@ -389,7 +391,7 @@ def Icepack(solver, h, u, smb, basal_melt_field, bed, dt, h0, kwargs):
      # ---- net accumulation used by prognostic step ------
     a = icepack.interpolate((smb - basal_melt_field) * w2i, kwargs["Q"])
 
-    print(f"\n Inside Icepack: mean BMR field = {np.mean(basal_melt_field.dat.data_ro)} \n")
+    #print(f"\n Inside Icepack: mean BMR field = {np.mean(basal_melt_field.dat.data_ro)} \n")
 
     h = solver.prognostic_solve(
         dt = dt,
@@ -470,17 +472,19 @@ def run_model(ensemble, **kwargs):
     step = k 
 
     # -- steps at which to save profiles of the ensemble --
-    flowline_profile_steps = [t/dt for t in kwargs["save_steps"]]
+    flowline_profile_steps = [x/dt for x in kwargs["save_steps"]]
 
     h_vec = ensemble[indx_map["h"]]
     u_vec = ensemble[indx_map["u"]]
     v_vec = ensemble[indx_map["v"]]
     s_vec = ensemble[indx_map["s"]]
+    basal_melt_vec = ensemble[indx_map["basal_melt_field"]]
 
     #print(f"h_vec_mean={np.mean(h_vec)}, u_vec_mean = {np.mean(u_vec)}, v_vec_mean = {np.mean(v_vec)}\n")
 
-    if kwargs["joint_estimation"]:
-        basal_melt_vec = ensemble[indx_map["basal_melt_field"]]
+    # -- disregard since we're treating basal melt as a state variable 
+    #if kwargs["joint_estimation"]:
+        #basal_melt_vec = ensemble[indx_map["basal_melt_field"]]
 
     h = Function(Q)
     u = Function(V)
@@ -497,116 +501,149 @@ def run_model(ensemble, **kwargs):
 
     ### Conditionals for depth-dependent basal melt rate function
     ### Select forcing scenario between 1935 - 2017 
+    experiment = False
+
     if step < (6/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1935 - 1941
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment) # 1935 - 1941
    
     elif (6 / dt) <= step < (15/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1941 - 1950
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = experiment) # 1941 - 1950
     
     elif (15 / dt) <= step < (18/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1950 - 1953
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment) # 1950 - 1953
     
     elif (18/ dt) <= step < (20/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1953 - 1955
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = experiment) # 1953 - 1955
         
     elif (20/ dt) <= step < (25/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1955 - 1960
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment) # 1955 - 1960
         
     elif (25/ dt) <= step < (27/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1960 - 1962
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = experiment) # 1960 - 1962
         
     elif (27/ dt) <= step < (31/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1962 - 1966
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment) # 1962 - 1966
         
     elif (31/ dt) <= step < (40/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1966 - 1975
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = experiment) # 1966 - 1975
         
     elif (40/ dt) <= step < (48/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1975 - 1983
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment) # 1975 - 1983
         
     elif (48/dt) <= step < (50/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1983 - 1985
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = experiment) # 1983 - 1985
         
     elif (50/ dt) <= step < (59/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1985 - 1994
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment) # 1985 - 1994
         
     elif (59/ dt) <= step < (64/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1994 - 2000
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = experiment) # 1994 - 2000
         
     elif (64/ dt) <= step < (69/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 2000 - 2005
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment) # 2000 - 2005
         
     elif (69/ dt) <= step < (76/dt):
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 2005 - 2012
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = experiment) # 2005 - 2012
         
     elif (76/ dt) <= step:
-        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 2012 - 2017
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment) # 2012 - 2017
 
+    else:
+        experiment = True
+        basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = experiment)
     
     #print(f"\n dt = {dt}, maximum basal melt rate = {melt_max} \n")
      
-    h, u, s = Icepack(solver, h, u, smb, basal_melt_field, bed, dt, h0, kwargs)
+    h, u, s, floating, grounded = Icepack(solver, h, u, smb, basal_melt_field, bed, dt, h0, kwargs)
 
     # ----- joint estimation --------
 
     # if kwargs["joint_estimation"]:
-
     #     bmr_vec = ensemble[indx_map["basal_melt_field"]]
     #     basal_melt = Function(Q)
-    #     basal_melt.dat.data[:] = bmr_vec.copy()
-   
+    #     basal_melt.dat.data[:] = bmr_vec.copy() 
     # else:
-    #     basal_melt = kwargs.get('basal_melt_field', None)
-        
+    #     basal_melt = kwargs.get('basal_melt_field', None)       
     #     if basal_melt is None:
     #         raise ValueError("basal_melt_field missing in kwargs when joint_estimation=False")
 
+    #if kwargs["joint_estimation"]:
+        #updated_state['basal_melt_field'] = basal_melt_field.dat.data_ro
+
+  
     # return a list of the updated state variables
     updated_state = {'h': h.dat.data_ro,
                      'u': u.dat.data_ro[:,0],
                      'v': u.dat.data_ro[:,1],
-                     's': s.dat.data_ro}
+                     's': s.dat.data_ro,
+                     'basal_melt_field': basal_melt_field.dat.data_ro}
     
-    if kwargs["joint_estimation"]:
-        updated_state['basal_melt_field'] = basal_melt_field.dat.data_ro
-
     
     # -- extract the flowline profile at particular steps -- 
-    
-    
-    #if step in int(flowline_profile_steps):
-       
-    hs_ensemble_files = f"_modelrun_datasets/hs_ensemble_profiles{ens}"
-    with h5py.File(hs_ensemble_files, "r") as F:
-        valid_points = F["valid_points"][:]
-
-    h_profiles, s_profiles = flowline_profile(h, s, valid_points)
-    print(s_profiles.shape, h_profiles.shape,"\n")
 
     print(f"t[{k}] = {t[k]}")
 
-    # -- manually saving at the time steps but need to find an efficient way to determine this --
-    if t[k] == 5:
-        print(f"t[{k}] = {t[k]}")
-        with h5py.File(hs_ensemble_files, "a") as F:
-            F["h_profiles"][:,1] = h_profiles
-            F["s_profiles"][:,1] = s_profiles
-    
-    if t[k] == 10:
-        print(f"t[{k}] = {t[k]}")
-        with h5py.File(hs_ensemble_files, "a") as F:
-            F["h_profiles"][:,2] = h_profiles
-            F["s_profiles"][:,2] = s_profiles
-    
-    if t[k] == 20:
-        print(f"t[{k}] = {t[k]}")
-        with h5py.File(hs_ensemble_files, "a") as F:
-            F["h_profiles"][:,3] = h_profiles
-            F["s_profiles"][:,3] = s_profiles
+      
+    # if we're at a time step where we want to save a profile 
+    if step in flowline_profile_steps:
+
+        ##### DEBUGGING
+        print("inside a flowline profile step!")
+
+        # CREATE a file (per ensemble member) at the particular time step
+        hs_ensemble_files = f"_modelrun_datasets/hs_ensemble_profiles_ens{ens}_time{t[step]}"
+
+
+
+        # OPEN an older file where 'valid_points' is saved
+        ens_valid_points = f"_modelrun_datasets/hs_ensemble_profiles_ens0_time0"
+        # retrieve the saved 'valid_points' from which to sample profile points
+        with h5py.File(ens_valid_points, "r") as F:
+            valid_points = F["valid_points"][:]
+        # now extract profiles of ice thickness and surface elevation
+        h_profiles, s_profiles = flowline_profile(h, s, valid_points)
+        # sanity check
+        print(s_profiles.shape, h_profiles.shape,"\n")
+
+
+
+        # MANUALLY save profiles at years 1970, 2005, & 2017 (need more efficient way to do this)
+        if t[k] == 34:
+            with h5py.File(hs_ensemble_files, "w") as F:
+                    dataset_h_ensemble = F.create_dataset("h_profiles", len(valid_points), dtype = "f8")
+                    dataset_s_ensemble = F.create_dataset("s_profiles", len(valid_points), dtype = "f8")
+                    dataset_s_ensemble[:] = s_profiles 
+                    dataset_h_ensemble[:] = h_profiles 
+                    
+
+        if t[k] == 69:
+            with h5py.File(hs_ensemble_files, "w") as F:
+                dataset_h_ensemble = F.create_dataset("h_profiles", len(valid_points), dtype = "f8")
+                dataset_s_ensemble = F.create_dataset("s_profiles", len(valid_points), dtype = "f8")
+                dataset_s_ensemble[:] = s_profiles 
+                dataset_h_ensemble[:] = h_profiles 
+                
+
+        if t[k] == 81:
+            with h5py.File(hs_ensemble_files, "w") as F:
+                dataset_h_ensemble = F.create_dataset("h_profiles", len(valid_points), dtype = "f8")
+                dataset_s_ensemble = F.create_dataset("s_profiles", len(valid_points), dtype = "f8")
+                dataset_s_ensemble[:] = s_profiles 
+                dataset_h_ensemble[:] = h_profiles 
+               
 
 
 
     return updated_state
+
+
+
+# Fetching mesh coordinates for perturbation generation
+from ICESEE.applications.icepack_model.icepack_utils._coordinates import (
+    register_icepack_coordinate_provider,
+)
+
+register_icepack_coordinate_provider()
 
 
 

@@ -1,8 +1,8 @@
 
 modeling-parameters:
   # Model parameters
-  num_years: 5         # number of years to run the model
-  timesteps_per_year: 0.2   # number of timesteps per year
+  num_years: 82         # number of years to run the model
+  timesteps_per_year: 0.05   # number of timesteps per year
   initFile: 'data/extended_beta1000yrs.h5' # input file
   paramsFile: 'data/extended_beta1000yrs.yaml' # parameter file
   meshFile: 'data/PigFull2017GeomFull.exp' # mesh file
@@ -17,25 +17,26 @@ modeling-parameters:
   experiments: 0                     # experiment 1 for changing timing of basal melt, 1 for changing C, 2 for ... 
   bmr_increase_time: 0               # timing (in years) of when to begin a linear increase in BMR (relative to start of simulation)
   #save_steps: [19, 34, 54, 69, 81]  # years into the simulation at which to save the flowline profile (for a simulation of PIG between 1935 - 2017)
-  save_steps: [0, 2, 3, 4]              # years into the simulation at which to save the flowline profile
+  save_steps: [34, 69, 81]           # years into the simulation at which to save the flowline profile (OMIT SAVING THE INITIAL STATE that is saved manually)
 
 enkf-parameters:
   # Ensemble Kalman Filter parameters
-  Nens: 40                 # number of ensemble members (now set in the command line)
+  #Nens: 40                 # number of ensemble members (now set in the command line)
   freq_obs: 1              # frequency of observations (per year?)
-  obs_max_time: 4         # maximum time for observations
-  obs_start_time: 2        # start time for observations
+  obs_max_time: 40         # maximum time for observations
+  obs_start_time: 10        # start time for observations
+  random_field_method: graph   # graph or fft
 
   num_state_vars: 5      # number of state variables  [h ,u, v, s, bmr]
   num_param_vars: 0       # number of parameter variables [bmr]
   vec_inputs: ['h','u','v', 's', 'basal_melt_field']
   observed_params: ['s']  # surface elevation
 
-  generate_synthetic_obs: 0  # Generate synthetic observations for testing
+  generate_synthetic_obs: 1  # Generate synthetic observations for testing
   generate_true_state:    1  # Generate true state for synthetic observations
   generate_nurged_state:  1  # Generate nudged state for synthetic observations
-  initialize_ensemble: 0
-  use_ensemble_pertubations: 0 # Use ensemble perturbations for ensemble state
+  initialize_ensemble: 1
+  use_ensemble_pertubations: 1 # Use ensemble perturbations for ensemble state
   sequential_ensemble_initialization: 0  # Sequential ensemble initialization (True for sequential, False for parallel)
 
   # Statistical parameters (based on the number of state variables)
@@ -51,7 +52,7 @@ enkf-parameters:
   # estimation flags
   joint_estimation: 0 # joint estimation flag: True, False
   parameter_estimation: False # parameter estimation flag: True, False
-  joint_estimated_params: ['basal_melt_field']  # parameter(s) to be jointly estimated
+  joint_estimated_params: [] # parameter(s) to be jointly estimated
 
   # nudged parameters
   wrong_basal_melt_field: 5         # scalar factor to "nudge" the basal melt rate field
