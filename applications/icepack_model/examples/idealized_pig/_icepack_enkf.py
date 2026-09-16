@@ -20,43 +20,43 @@ register_icepack_coordinate_provider()
 
 
 # --- Forecast step ---
-def forecast_step_single(ensemble=None, **kwargs):
+def forecast_step_single(ensemble=None, **icesee_kwargs):
     """ensemble: packs the state variables:h,u,v of a single ensemble member
-                 where h is thickness, u and v are the x and y components 
+                 where h is thickness, u and v are the x and y components
                  of the velocity field
     Returns: ensemble: updated ensemble member
     """
     #  call the run_model fun to push the state forward in time
-    return run_model(ensemble, **kwargs)
+    return run_model(ensemble, **icesee_kwargs)
 
 
 # --- generate true state ---
-def generate_true_state(**kwargs):
+def generate_true_state(**icesee_kwargs):
     """generate the true state of the model"""
-    
-    # # unpack the **kwargs
-    smb  = kwargs.get('smb', None)
-    basal_melt_field = kwargs.get('basal_melt_field', None)
-    bed  = kwargs.get('bed', None)
-    dt = kwargs.get('dt', None)
-    nt = kwargs.get('nt', None)
-    A0  = kwargs.get('A0', None)
-    beta0  = kwargs.get('beta0', None)
-    Q  = kwargs.get('Q', None)
-    V  = kwargs.get('V', None)
-    h0 = kwargs.get('h0', None)
-    u0 = kwargs.get('u', None)
-    s0 = kwargs.get('s0', None)
-    floating = kwargs.get('floating', None)
-    grounded = kwargs.get('grounded', None)
-    solver = kwargs.get('solver', None)
-    statevec_true = kwargs["statevec_true"]
-    save_steps = kwargs.get('save_steps', None)
+
+    # # unpack the **icesee_kwargs
+    smb  = icesee_kwargs.get('smb', None)
+    basal_melt_field = icesee_kwargs.get('basal_melt_field', None)
+    bed  = icesee_kwargs.get('bed', None)
+    dt = icesee_kwargs.get('dt', None)
+    nt = icesee_kwargs.get('nt', None)
+    A0  = icesee_kwargs.get('A0', None)
+    beta0  = icesee_kwargs.get('beta0', None)
+    Q  = icesee_kwargs.get('Q', None)
+    V  = icesee_kwargs.get('V', None)
+    h0 = icesee_kwargs.get('h0', None)
+    u0 = icesee_kwargs.get('u', None)
+    s0 = icesee_kwargs.get('s0', None)
+    floating = icesee_kwargs.get('floating', None)
+    grounded = icesee_kwargs.get('grounded', None)
+    solver = icesee_kwargs.get('solver', None)
+    statevec_true = icesee_kwargs["statevec_true"]
+    save_steps = icesee_kwargs.get('save_steps', None)
 
     # # call the icesee_get_index function to get the indices of the state variables
-    vecs, indx_map, dim_per_proc = icesee_get_index(**kwargs)
+    vecs, indx_map, dim_per_proc = icesee_get_index(**icesee_kwargs)
 
-    
+
     # # --- fetch the state variables ---
     statevec_true[indx_map["h"],0] = h0.dat.data_ro
     statevec_true[indx_map["u"],0] = u0.dat.data_ro[:,0]
@@ -66,7 +66,7 @@ def generate_true_state(**kwargs):
 
 
     # # add BMR field to EnKF state vector if joint estimation is enabled 
-    #if kwargs["joint_estimation"]:
+    #if icesee_kwargs["joint_estimation"]:
         #statevec_true[indx_map["basal_melt_field"],0] = basal_melt_field.dat.data_ro
 
     h = h0.copy(deepcopy=True)
@@ -75,18 +75,18 @@ def generate_true_state(**kwargs):
     basal_melt_field = basal_melt_field.copy(deepcopy=True)
 
     # --- extract a profile of the flowline at the initial state ---
-    h_profiles, s_profiles, valid_points, distances, bed_values = initial_flowline_profile(kwargs)
+    h_profiles, s_profiles, valid_points, distances, bed_values = initial_flowline_profile(icesee_kwargs)
 
     #### DEBUGGING
     print(f"\n INITIAL h_profiles_mean = {np.mean(h_profiles)}, s_profiles_mean = {np.mean(s_profiles)} \n")
     #############
 
     # --- step numbers at which to extract flowline profiles during the simulation -- 
-    flowline_profile_steps = [t/dt for t in kwargs["save_steps"]]
+    flowline_profile_steps = [t/dt for t in icesee_kwargs["save_steps"]]
     print(f"\n steps where profiles are sampled = {flowline_profile_steps} \n")
 
     hs_files = f"_modelrun_datasets/hs_profiles_true"
-    
+
     with h5py.File(hs_files, "w") as F:
         dataset_h = F.create_dataset("h_profiles", (len(valid_points), len(save_steps) + 1), dtype = "f8")
         dataset_s = F.create_dataset("s_profiles", (len(valid_points), len(save_steps) + 1), dtype = "f8")
@@ -95,10 +95,10 @@ def generate_true_state(**kwargs):
         dataset_bed = F.create_dataset("bed_values", data = bed_values)
         dataset_distances = F.create_dataset("distances", data = distances)
 
-    
-   
+
+
     kk = 0
-    
+
     # loop through each step (k = 0 to k = 100)
     for k in range(nt):
 
@@ -107,51 +107,51 @@ def generate_true_state(**kwargs):
         print(f"Time step = {step}")        
 
         ### Conditionals for depth-dependent basal melt rate function
-        ### Select forcing scenario between 1935 - 2017 
+        ### Select forcing scenario between 1935 - 2017
         if step < (6/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1935 - 1941
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1935 - 1941
    
         elif (6 / dt) <= step < (15/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1941 - 1950
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1941 - 1950
     
         elif (15 / dt) <= step < (18/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1950 - 1953
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1950 - 1953
     
         elif (18/ dt) <= step < (20/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1953 - 1955
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1953 - 1955
         
         elif (20/ dt) <= step < (25/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1955 - 1960
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1955 - 1960
         
         elif (25/ dt) <= step < (27/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1960 - 1962
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1960 - 1962
         
         elif (27/ dt) <= step < (31/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1962 - 1966
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1962 - 1966
         
         elif (31/ dt) <= step < (40/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1966 - 1975
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1966 - 1975
         
         elif (40/ dt) <= step < (48/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1975 - 1983
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1975 - 1983
         
         elif (48/dt) <= step < (50/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1983 - 1985
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1983 - 1985
         
         elif (50/ dt) <= step < (59/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1985 - 1994
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 1985 - 1994
         
         elif (59/ dt) <= step < (64/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1994 - 2000
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 1994 - 2000
         
         elif (64/ dt) <= step < (69/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 2000 - 2005
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 2000 - 2005
         
         elif (69/ dt) <= step < (76/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 2005 - 2012
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "true") # 2005 - 2012
         
         elif (76/ dt) <= step:
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 2012 - 2017
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "true") # 2012 - 2017
 
 
         #### DEBUGGING 
@@ -161,7 +161,7 @@ def generate_true_state(**kwargs):
 
 
         # call the ice stream model to update the state variables
-        h, u, s, floating, grounded = Icepack(solver, h, u, smb, basal_melt_field, bed, dt, h0, kwargs)
+        h, u, s, floating, grounded = Icepack(solver, h, u, smb, basal_melt_field, bed, dt, h0, icesee_kwargs)
 
         statevec_true[indx_map["h"],k+1] = h.dat.data_ro
         statevec_true[indx_map["u"],k+1] = u.dat.data_ro[:,0]
@@ -171,13 +171,13 @@ def generate_true_state(**kwargs):
 
 
         # update the basal melt rate if joint estimation is enabled
-        #if kwargs["joint_estimation"]:
+        #if icesee_kwargs["joint_estimation"]:
             #statevec_true[indx_map["basal_melt_field"],k+1] = basal_melt_field.dat.data_ro
        
    
         if (kk <= len(flowline_profile_steps)-1):
             if (k == int(flowline_profile_steps[kk])):
-                
+
                 h_profiles, s_profiles = flowline_profile(h, s, valid_points)
                 #### DEBUGGING
                 print(f"\n Time step {k}: h_profiles_mean = {np.mean(h_profiles)}, s_profiles_mean = {np.mean(s_profiles)} \n")
@@ -190,8 +190,8 @@ def generate_true_state(**kwargs):
                 
                 kk += 1
 
-    updated_state = {}      
-    for key in kwargs["vec_inputs"]:
+    updated_state = {}
+    for key in icesee_kwargs["vec_inputs"]:
         updated_state[key] = statevec_true[indx_map[key], :]
 
     return updated_state
@@ -200,37 +200,37 @@ def generate_true_state(**kwargs):
 
 
 # --- initialize the ensemble members ---
-def initialize_ensemble(ens, **kwargs):
-    
+def initialize_ensemble(ens, **icesee_kwargs):
+
     """initialize the ensemble members"""
 
     ### unpack the **kwargs dictionary
-    smb  = kwargs.get('smb', None)
-    basal_melt_field = kwargs.get('basal_melt_field', None)
-    bed  = kwargs.get('bed', None)
-    dt = kwargs.get('dt', None)
-    nt = kwargs.get('nt', None)
-    A0  = kwargs.get('A0', None)
-    beta0  = kwargs.get('beta0', None)
-    Q  = kwargs.get('Q', None)
-    V  = kwargs.get('V', None)
-    h0 = kwargs.get('h0', None)
-    u0 = kwargs.get('u', None)
-    s0 = kwargs.get('s0', None)
-    floating = kwargs.get('floating', None)
-    grounded = kwargs.get('grounded', None)
-    solver = kwargs.get('solver', None)
-    save_steps = kwargs.get('save_steps', None)
+    smb  = icesee_kwargs.get('smb', None)
+    basal_melt_field = icesee_kwargs.get('basal_melt_field', None)
+    bed  = icesee_kwargs.get('bed', None)
+    dt = icesee_kwargs.get('dt', None)
+    nt = icesee_kwargs.get('nt', None)
+    A0  = icesee_kwargs.get('A0', None)
+    beta0  = icesee_kwargs.get('beta0', None)
+    Q  = icesee_kwargs.get('Q', None)
+    V  = icesee_kwargs.get('V', None)
+    h0 = icesee_kwargs.get('h0', None)
+    u0 = icesee_kwargs.get('u', None)
+    s0 = icesee_kwargs.get('s0', None)
+    floating = icesee_kwargs.get('floating', None)
+    grounded = icesee_kwargs.get('grounded', None)
+    solver = icesee_kwargs.get('solver', None)
+    save_steps = icesee_kwargs.get('save_steps', None)
 
 
     # # -- update parameter if joint estimation is enabled
-    #if kwargs["joint_estimation"]:
-        #basal_melt_field_nudged = basal_melt_field.dat.data_ro + kwargs["wrong_basal_melt_field"]
+    #if icesee_kwargs["joint_estimation"]:
+        #basal_melt_field_nudged = basal_melt_field.dat.data_ro + icesee_kwargs["wrong_basal_melt_field"]
         #basal_melt_field_nudged = basal_melt_field.dat.data_ro
         #basal_melt_field = Function(Q)
         #basal_melt_field.dat.data[:] = basal_melt_field_nudged
 
-    #h, u, s, floating, grounded = Icepack(solver, h, u0, smb, basal_melt_field, bed, dt, h0, kwargs)
+    #h, u, s, floating, grounded = Icepack(solver, h, u0, smb, basal_melt_field, bed, dt, h0, icesee_kwargs)
 
     initialized_state = {'h': h0.dat.data_ro,
                          'u': u0.dat.data_ro[:,0], 
@@ -240,7 +240,7 @@ def initialize_ensemble(ens, **kwargs):
     
 
     # --- create file to save ensemble flowline profiles ---
-    h_profiles, s_profiles, valid_points, distances, bed_values = initial_flowline_profile(kwargs)
+    h_profiles, s_profiles, valid_points, distances, bed_values = initial_flowline_profile(icesee_kwargs)
     hs_ensemble_files = f"_modelrun_datasets/hs_ensemble_profiles_ens{ens}_time0"
 
 
@@ -253,7 +253,7 @@ def initialize_ensemble(ens, **kwargs):
         dataset_bed_ensemble = F.create_dataset("bed_values", data = bed_values)
         dataset_distances_ensemble = F.create_dataset("distances", data = distances)
         dataset_valid_points_ensemble = F.create_dataset("valid_points", data = valid_points)
-    
+
     #print(f"\ndt = {dt}, h0_mean = {np.mean(h0.dat.data_ro)}, h_mean = {np.mean(initialized_state["h"])}, u_mean = {np.mean(u.dat.data_ro[:,0])}, v_mean = {np.mean(u.dat.data_ro[:,1])}\n")
 
     return initialized_state
@@ -262,35 +262,35 @@ def initialize_ensemble(ens, **kwargs):
 
 
 # --- generate the nurged state ---
-def generate_nurged_state(**kwargs):
+def generate_nurged_state(**icesee_kwargs):
 
     """generate the nudged state of the model"""
     
     # unpack the **kwargs
-    smb  = kwargs.get('smb', None)
-    basal_melt_field = kwargs.get('basal_melt_field', None)
-    bed  = kwargs.get('bed', None)
-    dt = kwargs.get('dt', None)
-    nt = kwargs.get('nt', None)
-    A0  = kwargs.get('A0', None)
-    beta0  = kwargs.get('beta0', None)
-    Q  = kwargs.get('Q', None)
-    V  = kwargs.get('V', None)
-    h0 = kwargs.get('h0', None)
-    u0 = kwargs.get('u', None)
-    s0 = kwargs.get('s0', None)
-    floating = kwargs.get('floating', None)
-    grounded = kwargs.get('grounded', None)
-    solver = kwargs.get('solver', None)
-    statevec_nurged = kwargs["statevec_nurged"]
-    save_steps = kwargs.get('save_steps', None)
+    smb  = icesee_kwargs.get('smb', None)
+    basal_melt_field = icesee_kwargs.get('basal_melt_field', None)
+    bed  = icesee_kwargs.get('bed', None)
+    dt = icesee_kwargs.get('dt', None)
+    nt = icesee_kwargs.get('nt', None)
+    A0  = icesee_kwargs.get('A0', None)
+    beta0  = icesee_kwargs.get('beta0', None)
+    Q  = icesee_kwargs.get('Q', None)
+    V  = icesee_kwargs.get('V', None)
+    h0 = icesee_kwargs.get('h0', None)
+    u0 = icesee_kwargs.get('u', None)
+    s0 = icesee_kwargs.get('s0', None)
+    floating = icesee_kwargs.get('floating', None)
+    grounded = icesee_kwargs.get('grounded', None)
+    solver = icesee_kwargs.get('solver', None)
+    statevec_nurged = icesee_kwargs["statevec_nurged"]
+    save_steps = icesee_kwargs.get('save_steps', None)
      
 
     # --- define the state variables list ---
-    vec_inputs = kwargs["vec_inputs"]
+    vec_inputs = icesee_kwargs["vec_inputs"]
 
     # call the icesee_get_index function to get the indices of the state variables
-    vecs, indx_map, dim_per_proc = icesee_get_index(**kwargs)
+    vecs, indx_map, dim_per_proc = icesee_get_index(**icesee_kwargs)
 
 
     statevec_nurged[indx_map["h"],0]   = h0.dat.data_ro
@@ -301,8 +301,8 @@ def generate_nurged_state(**kwargs):
     
 
     # # -- update parameter if joint estimation is enabled
-    # if kwargs["joint_estimation"]:
-    #     basal_melt_field_nudged = basal_melt_field.dat.data_ro * kwargs["wrong_basal_melt_field"]
+    # if icesee_kwargs["joint_estimation"]:
+    #     basal_melt_field_nudged = basal_melt_field.dat.data_ro * icesee_kwargs["wrong_basal_melt_field"]
     #     initial_perturbed_basal_melt_field = Function(Q)
     #     initial_perturbed_basal_melt_field.dat.data[:] = basal_melt_field_nudged
         
@@ -315,10 +315,10 @@ def generate_nurged_state(**kwargs):
          
 
     # --- extract a profile of the flowline at the initial state ---
-    h_profiles, s_profiles, valid_points, distances, bed_values = initial_flowline_profile(kwargs)
+    h_profiles, s_profiles, valid_points, distances, bed_values = initial_flowline_profile(icesee_kwargs)
 
-    # --- step numbers at which to extract flowline profiles during the simulation -- 
-    flowline_profile_steps = [t/dt for t in kwargs["save_steps"]]
+    # --- step numbers at which to extract flowline profiles during the simulation --
+    flowline_profile_steps = [t/dt for t in icesee_kwargs["save_steps"]]
 
     hs_nudged_files = f"_modelrun_datasets/hs_profiles_wrong"
 
@@ -332,7 +332,7 @@ def generate_nurged_state(**kwargs):
 
     # # -- index for saving flowline profiles
     kk = 0
-    
+
 
     # loop through each step (k = 0 to k = 100)
     for k in range(nt):
@@ -341,51 +341,51 @@ def generate_nurged_state(**kwargs):
         print(f"Time step = {step}") 
 
         ### Conditionals for depth-dependent basal melt rate function
-        ### Select forcing scenario between 1935 - 2017 
+        ### Select forcing scenario between 1935 - 2017
         if step < (6/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1935 - 1941
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1935 - 1941
    
         elif (6 / dt) <= step < (15/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1941 - 1950
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1941 - 1950
     
         elif (15 / dt) <= step < (18/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1950 - 1953
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1950 - 1953
     
         elif (18/ dt) <= step < (20/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1953 - 1955
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1953 - 1955
         
         elif (20/ dt) <= step < (25/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1955 - 1960
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1955 - 1960
         
         elif (25/ dt) <= step < (27/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1960 - 1962
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1960 - 1962
         
         elif (27/ dt) <= step < (31/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1962 - 1966
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1962 - 1966
         
         elif (31/ dt) <= step < (40/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1966 - 1975
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1966 - 1975
         
         elif (40/ dt) <= step < (48/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1975 - 1983
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1975 - 1983
         
         elif (48/dt) <= step < (50/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1983 - 1985
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1983 - 1985
         
         elif (50/ dt) <= step < (59/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1985 - 1994
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 1985 - 1994
         
         elif (59/ dt) <= step < (64/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1994 - 2000
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 1994 - 2000
         
         elif (64/ dt) <= step < (69/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 2000 - 2005
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 2000 - 2005
         
         elif (69/ dt) <= step < (76/dt):
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 2005 - 2012
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='warm', experiment = "false") # 2005 - 2012
         
         elif (76/ dt) <= step:
-            basal_melt_field, melt_max = BasalMeltRate(kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 2012 - 2017
+            basal_melt_field, melt_max = BasalMeltRate(icesee_kwargs, step, floating, Q, s, h, scenario='control', experiment = "false") # 2012 - 2017
 
         
         # DEBUGGING
@@ -394,7 +394,7 @@ def generate_nurged_state(**kwargs):
     
         
         # call the ice stream model to update the state variables
-        h, u, s, floating, grounded = Icepack(solver, h, u, smb, basal_melt_field, bed, dt, h0, kwargs)
+        h, u, s, floating, grounded = Icepack(solver, h, u, smb, basal_melt_field, bed, dt, h0, icesee_kwargs)
 
         statevec_nurged[indx_map["h"],k+1] = h.dat.data_ro
         statevec_nurged[indx_map["u"],k+1] = u.dat.data_ro[:,0]
@@ -404,8 +404,8 @@ def generate_nurged_state(**kwargs):
 
 
         # # -- update parameter if joint estimation is enabled
-        #if kwargs["joint_estimation"]:
-            #basal_melt_field_nudged = basal_melt_field.dat.data_ro * kwargs["wrong_basal_melt_field"]
+        #if icesee_kwargs["joint_estimation"]:
+            #basal_melt_field_nudged = basal_melt_field.dat.data_ro * icesee_kwargs["wrong_basal_melt_field"]
             #basal_melt_field = Function(Q)
             #basal_melt_field.dat.data[:] = basal_melt_field_nudged
 
@@ -415,7 +415,7 @@ def generate_nurged_state(**kwargs):
        # # -- saving flowline profile at certain steps
         if (kk <= len(flowline_profile_steps)-1):
             if (k == int(flowline_profile_steps[kk])):
-                
+
                 h_profiles, s_profiles = flowline_profile(h, s, valid_points)
                 print(s_profiles.shape,h_profiles.shape,"\n")
                 #print(f"n\ average thickness = {np.mean(h.dat.data_ro)} and average BMR = {np.mean(basal_melt_field.dat.data_ro)} \n")
@@ -427,8 +427,8 @@ def generate_nurged_state(**kwargs):
                 
                 kk += 1
 
-    updated_state = {}      
-    for key in kwargs["vec_inputs"]:
+    updated_state = {}
+    for key in icesee_kwargs["vec_inputs"]:
         updated_state[key] = statevec_nurged[indx_map[key], :]
 
     return updated_state
